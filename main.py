@@ -1,11 +1,11 @@
 import pathlib
 import time
 
-from src.dataset import load_dataset
-from src.investments import invest_random, invest_tabu
-from src.reporting import report_random_search, report_tabu_search, results_comparison
-from src.frontier import efficientfrontier
-from src.plotting import plot_boxplot_R, plot_boxplot_f
+from src.utils.dataset import load_dataset
+from src.utils.investments import invest_random, invest_tabu
+from src.utils.reporting import report_random_search, report_tabu_search, results_comparison
+from src.utils.frontier import efficientfrontier
+from src.utils.plotting import plot_boxplot_R, plot_boxplot_f
 
 # ─── Config ───────────────────────────────────────────────────────────────────
 TOTAL_INVESTMENT = 1_000_000_000   # 1 Billion
