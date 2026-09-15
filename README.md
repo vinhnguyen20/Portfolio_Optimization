@@ -1,63 +1,58 @@
-# Portfolio Optimization
-Heuristics for cardinality constrained portfolio optimisation trên thị trường **Crypto** với dữ liệu real-time từ **Binance**.
+# Portfolio Optimization — Crypto
 
-<br/>
-
----
-
-## Summary
-
-Dự án tối ưu hoá danh mục đầu tư crypto với ngân sách **£1 tỷ**, xác định danh mục **10 coin tốt nhất** dựa trên mức độ lợi nhuận và rủi ro, có xét đến sự tương quan giữa các coin thông qua ma trận covariance.
-
-Hai mục tiêu chính:
-- **Tối thiểu hoá** expected variance (rủi ro) của danh mục
-- **Tối đa hoá** expected return (lợi nhuận) của danh mục
-
-Hai thuật toán heuristic được triển khai và so sánh:
-- **Random Search** — baseline ngẫu nhiên
-- **Tabu Search** — leo đồi có nhớ, cho kết quả tốt hơn đáng kể
+Tối ưu hoá danh mục đầu tư crypto bằng thuật toán heuristic, dữ liệu real-time từ **Binance**.
 
 ---
 
-## Project Structure
+## Tổng quan
+
+Chọn **10 coin tốt nhất** từ danh sách coin Binance và phân bổ tỷ trọng tối ưu, dựa trên hai tiêu chí:
+
+- **Tối đa hoá** lợi nhuận kỳ vọng `R`
+- **Tối thiểu hoá** rủi ro `CoVar`
+
+Hai thuật toán được so sánh: **Random Search** (baseline) và **Tabu Search** (tốt hơn đáng kể).
+
+---
+
+## Cấu trúc project
 
 ```
 PortfolioOptimization/
 │
-├── main.py                      # Entry point — chạy toàn bộ pipeline
-├── fetch_binance_data.py        # Fetch dữ liệu crypto real-time từ Binance API
+├── main.py                      # Chạy toàn bộ pipeline
+├── fetch_binance_data.py        # Fetch dữ liệu từ Binance API
 │
 ├── datasets/
-│   └── binance_assets.txt       # Crypto data từ Binance (tự động tạo)
+│   └── binance_assets.txt       # Dữ liệu coin (tự động tạo)
 │
-├── src/
-│   └── utils/
-│       ├── dataset.py           # load_dataset(), create_candidate()
-│       ├── investments.py       # evaluate(), random_search(), invest_random()
-│       │                        # tabu_search(), invest_tabu()
-│       ├── reporting.py         # report_random_search(), report_tabu_search()
-│       │                        # results_comparison()
-│       ├── frontier.py          # dominated(), efficientfrontier()
-│       └── plotting.py          # plot_boxplot_R/f()
+├── src/utils/
+│   ├── dataset.py               # load_dataset(), create_candidate()
+│   ├── investments.py           # evaluate(), random_search(), invest_random()
+│   │                            # tabu_search(), invest_tabu()
+│   ├── reporting.py             # report_random_search(), report_tabu_search()
+│   │                            # results_comparison()
+│   ├── frontier.py              # dominated(), efficientfrontier()
+│   └── plotting.py              # plot_boxplot_R/f(), market_comparison_plot()
 │
-└── results_YYYY_MM_DD-HHMM/     # Kết quả mỗi lần chạy (PNG, Excel, TXT)
+└── results_YYYY_MM_DD-HHMM/     # Kết quả mỗi lần chạy
 ```
 
 ---
 
-## Quick Start
+## Cách chạy
 
-### 1. Cài dependencies
+### 1. Cài thư viện
 ```bash
 pip install numpy pandas matplotlib requests openpyxl
 ```
 
-### 2. Fetch dữ liệu từ Binance
+### 2. Fetch dữ liệu Binance
 ```bash
 # Mặc định: top 20 crypto, daily, 1 năm
 python fetch_binance_data.py
 
-# Tuỳ chỉnh symbols và interval
+# Tuỳ chỉnh
 python fetch_binance_data.py \
   --symbols BTCUSDT ETHUSDT BNBUSDT SOLUSDT XRPUSDT \
   --interval 1d --lookback 365 \
@@ -69,97 +64,81 @@ python fetch_binance_data.py \
 python main.py
 ```
 
-Kết quả được lưu vào thư mục `results_YYYY_MM_DD-HHMM/`.
+---
+
+## Cấu hình (`main.py`)
+
+```python
+FORCED_ASSETS    = [0]           # Coin luôn được chọn (0 = BTC, 1 = ETH, ...)
+TOTAL_INVESTMENT = 1_000_000_000 # Vốn đầu tư
+MIN_INVEST       = 0.01          # Tỷ trọng tối thiểu mỗi coin (1%)
+MAX_INVEST       = 1.0           # Tỷ trọng tối đa mỗi coin (100%)
+DEFAULT_L_STAR   = 7             # Tabu tenure mặc định
+```
 
 ---
 
-## Objective Function
+## Hàm mục tiêu
 
-Tối thiểu hoá hàm mục tiêu:
+$$f = \lambda \cdot CoVar - (1 - \lambda) \cdot R$$
 
-$$f(s) = \lambda \cdot CoVar(s) - (1 - \lambda) \cdot R(s)$$
-
-Trong đó:
-
-$$CoVar = \sum_{i=1}^{N} \sum_{j=1}^{N} w_i \, w_j \, \rho_{ij} \, \sigma_i \, \sigma_j$$
-
-$$R = \sum_{i=1}^{N} w_i \, \mu_i$$
+$$CoVar = \sum_{i=1}^{N} \sum_{j=1}^{N} w_i \, w_j \, \rho_{ij} \, \sigma_i \, \sigma_j \qquad R = \sum_{i=1}^{N} w_i \, \mu_i$$
 
 | Ký hiệu | Ý nghĩa |
 |---|---|
-| `λ` (lambda) | Tham số cân bằng risk vs return ∈ [0, 1] |
-| `CoVar` | Covariance — đo rủi ro danh mục |
-| `R` | Expected return — lợi nhuận kỳ vọng |
-| `wi` | Tỷ trọng đầu tư vào coin i |
-| `μi` | Expected return của coin i |
+| `λ` | Cân bằng rủi ro và lợi nhuận (0 → 1) |
+| `CoVar` | Rủi ro danh mục |
+| `R` | Lợi nhuận kỳ vọng |
+| `wi` | Tỷ trọng coin i |
+| `μi` | Lợi suất kỳ vọng coin i |
 | `ρij` | Correlation giữa coin i và j |
-| `σi` | Standard deviation của coin i |
+| `σi` | Độ lệch chuẩn coin i |
 
-**Ràng buộc:** chọn đúng K=10 coin, mỗi coin đầu tư tối thiểu 1% (`ε`), tổng tỷ trọng = 1.
-
----
-
-## Dataset Format
-
-File `datasets/binance_assets.txt` được tạo tự động bởi `fetch_binance_data.py`:
-
-```
-20                    # số lượng coin N
--0.283070 0.369139   # annualized return, std dev của coin 1 (BTCUSDT)
--0.409019 0.531174   # annualized return, std dev của coin 2 (ETHUSDT)
-...
-1 1 1.000000         # correlation giữa coin 1 và coin 1 (diagonal)
-1 2 0.874521         # correlation giữa coin 1 và coin 2
-...
-```
+**Ràng buộc:** đúng K=10 coin, mỗi coin tối thiểu 1%, tổng tỷ trọng = 1.
 
 ---
 
-## Optimization Algorithms
+## Thuật toán
 
 ### Random Search
-
-Sinh ngẫu nhiên `1000×N` nghiệm, mỗi nghiệm chọn K=10 coin và phân bổ tỷ trọng ngẫu nhiên. Lấy nghiệm tốt nhất theo hàm mục tiêu f.
+Sinh ngẫu nhiên `1000 × N` nghiệm, mỗi nghiệm chọn 10 coin và phân bổ tỷ trọng ngẫu nhiên. Lấy nghiệm có `f` nhỏ nhất.
 
 ### Tabu Search
+Leo đồi có nhớ — bắt đầu từ nghiệm tốt nhất của Random Search, tìm "hàng xóm" bằng cách tăng/giảm tỷ trọng 10%. Cấm quay lại các nước đi vừa thực hiện trong `L*` bước.
 
-Thuật toán leo đồi có nhớ — bắt đầu từ nghiệm tốt nhất của Random Search, tìm kiếm "hàng xóm" bằng cách tăng/giảm tỷ trọng 10%.
+Các giá trị `L*` được kiểm tra:
 
-**Tabu List `L_im[i][m]`:** cấm đi lại các bước vừa thực hiện trong `L*` bước tiếp theo.
+$$L^* \in \{1,\ 2,\ 5,\ 7,\ 10,\ 15\}$$
 
-### Parameter Optimization (L*)
-
-Các giá trị L* được kiểm tra:
-
-$$L^* = \{1, 2, 5, 7, 10, 15\}$$
-
-Quy tắc kinh nghiệm chọn L* tối ưu theo kích thước bài toán n:
+Quy tắc chọn `L*` theo kích thước bài toán `n`:
 
 $$L^* \in \left[0.5\sqrt{n},\ 2\sqrt{n}\right]$$
 
-Với 20 coin (N=20): L* tối ưu = **7**.
+---
+
+## Giải thích từng hàm
+
+| Hàm | File | Chức năng |
+|---|---|---|
+| `load_dataset()` | `dataset.py` | Đọc file .txt → dict (N, mu, sigma, ...) |
+| `create_candidate()` | `dataset.py` | Tạo 1 danh mục ngẫu nhiên (Q, s, w) |
+| `evaluate()` | `investments.py` | Tính R, CoVar, f cho 1 danh mục |
+| `random_search()` | `investments.py` | Chạy 1 lần Random Search |
+| `invest_random()` | `investments.py` | Chạy Random Search 30 lần × 30 seed |
+| `tabu_search()` | `investments.py` | Chạy 1 lần Tabu Search |
+| `invest_tabu()` | `investments.py` | Chạy Tabu Search cho nhiều L* × 30 seed |
+| `report_random_search()` | `reporting.py` | Lưu thống kê RS → file .txt |
+| `report_tabu_search()` | `reporting.py` | Lưu thống kê TS → file .txt |
+| `results_comparison()` | `reporting.py` | So sánh RS vs TS |
+| `dominated()` | `frontier.py` | Lọc Efficient Frontier (Pareto) |
+| `efficientfrontier()` | `frontier.py` | Vẽ biểu đồ Efficient Frontier |
+| `plot_boxplot_R/f()` | `plotting.py` | Vẽ boxplot so sánh các thuật toán |
 
 ---
 
-## Efficient Frontier
+## Kết quả đầu ra
 
-Chạy với E=50 giá trị λ ∈ [0,1] → 50 danh mục tối ưu → đường Efficient Frontier.
-
-```
-Return
-  ^
-  |        ● ●
-  |      ●       ← Efficient Frontier
-  |    ●            (danh mục tốt nhất tại mỗi mức rủi ro)
-  |  ●
-  +──────────────> Risk (CoVar)
-```
-
----
-
-## Results Output
-
-Mỗi lần chạy tạo ra thư mục `results_YYYY_MM_DD-HHMM/` chứa:
+Mỗi lần chạy tạo thư mục `results_YYYY_MM_DD-HHMM/`:
 
 | File | Nội dung |
 |---|---|
@@ -168,14 +147,14 @@ Mỗi lần chạy tạo ra thư mục `results_YYYY_MM_DD-HHMM/` chứa:
 | `*_Q2_e.txt` | So sánh RS vs TS |
 | `*_Q3_R.png` | Boxplot Revenue theo L* |
 | `*_Q3_f.png` | Boxplot f-value theo L* |
-| `*_Q4_H_RS/TS_filtered.xlsx` | Efficient Frontier points |
-| `*_Q4_AssetsToInvest_*.xlsx` | Danh sách coin nên mua |
+| `*_Q4_AssetsToInvest_*.xlsx` | Danh sách 10 coin nên mua |
 | `*_Q4_WeightToInvest_*.xlsx` | Tỷ trọng tối ưu từng coin |
+| `*_Q4_H_*_filtered.xlsx` | Tất cả danh mục trên Efficient Frontier |
 | `*_Q4_Frontier_RS/TS.png` | Biểu đồ Efficient Frontier |
 
 ---
 
-## References
+## Tham khảo
 
 T.-J. Chang, N. Meade, J.E. Beasley, Y.M. Sharaiha, *Heuristics for cardinality constrained portfolio optimisation*, Computers & Operations Research, 27(13):1271–1302, 2000.
 https://doi.org/10.1016/S0305-0548(99)00074-X
