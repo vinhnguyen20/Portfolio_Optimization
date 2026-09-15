@@ -58,7 +58,7 @@ def evaluate(candidate, dataset, lamda, V, H):
     return candidate, candidate['R'], candidate['CoVar'], f, improved
 
 
-def random_search(dataset, max_evals, E):
+def random_search(dataset, max_evals, E, forced_indices=None):
     """
     Random Search over E lambda values.
     Returns (best_R, best_CoVar, best_f, best_candidate, H).
@@ -75,7 +75,7 @@ def random_search(dataset, max_evals, E):
 
         V[lamda[0]] = float('inf')
         for _ in range(max_evals):
-            candidate = create_candidate(dataset['N'], K)
+            candidate = create_candidate(dataset['N'], K, forced_indices)
             candidate, R, CoVar, f, _ = evaluate(candidate, dataset, lamda, V, H)
 
             if f < best_f:
@@ -87,7 +87,7 @@ def random_search(dataset, max_evals, E):
     return best_R, best_CoVar, best_f, best_candidate, H
 
 
-def invest_random(dataset, max_evals, E):
+def invest_random(dataset, max_evals, E, forced_indices=None):
     """
     Run Random Search 30 times with different seeds.
     Returns DataFrame with columns [R, CoVar, f].
@@ -99,18 +99,19 @@ def invest_random(dataset, max_evals, E):
     for i, seed in enumerate(seeds):
         print(f'Random seed: {i + 1}/30')
         random.seed(int(seed))
-        best_R, best_CoVar, best_f, _, _ = random_search(dataset, max_evals, E)
+        best_R, best_CoVar, best_f, _, _ = random_search(dataset, max_evals, E, forced_indices)
         rows.append([best_R, best_CoVar, best_f[0]])
 
     return pd.DataFrame(rows, columns=['R', 'CoVar', 'f'])
 
 
-def tabu_search(dataset, max_evals, L, E):
+def tabu_search(dataset, max_evals, L, E, forced_indices=None):
     """
     Tabu Search for a given tenure L over E lambda values.
     Returns (best_R, best_CoVar, best_f, best_candidate, H).
     """
     epsilon = dataset['epsilon']
+    forced  = set(forced_indices) if forced_indices else set()
     H = []
     V = {}
 
@@ -124,7 +125,7 @@ def tabu_search(dataset, max_evals, L, E):
         # Warm-start: find best of 1000 random candidates
         S_star = None
         for _ in range(1000):
-            candidate = create_candidate(dataset['N'], K)
+            candidate = create_candidate(dataset['N'], K, forced_indices)
             candidate, _, _, _, improved = evaluate(candidate, dataset, lamda, V, H)
             if improved:
                 S_star = copy.deepcopy(candidate)
@@ -148,6 +149,8 @@ def tabu_search(dataset, max_evals, L, E):
                         C['s'][i] = 1.1 * (epsilon + S_star['s'][i]) - epsilon
 
                     if C['s'][i] < 0:
+                        if C['Q'][i] in forced:
+                            continue  # không được swap forced asset ra ngoài
                         available = list(set(range(dataset['N'])) - set(C['Q']))
                         C['Q'][i] = random.choice(available)
                         C['s'][i] = 0
@@ -172,7 +175,7 @@ def tabu_search(dataset, max_evals, L, E):
     return best_R, best_CoVar, best_f, S_star, H
 
 
-def invest_tabu(dataset, max_evals, L_star, E):
+def invest_tabu(dataset, max_evals, L_star, E, forced_indices=None):
     """
     Run Tabu Search for each L in L_star, 30 seeds each.
     Returns DataFrame with columns [L, R, CoVar, f].
@@ -188,7 +191,7 @@ def invest_tabu(dataset, max_evals, L_star, E):
             random.seed(int(seed))
 
             start = timer()
-            best_R, best_CoVar, best_f, _, _ = tabu_search(dataset, max_evals, L, E)
+            best_R, best_CoVar, best_f, _, _ = tabu_search(dataset, max_evals, L, E, forced_indices)
             print(timer() - start)
 
             rows.append([L, best_R, best_CoVar, best_f[0]])

@@ -57,12 +57,12 @@ def dominated(H, alg, file, results_dir):
     return dominated_points, dominating_points
 
 
-def efficientfrontier(L_star, E, dataset, max_evals, file, results_dir):
+def efficientfrontier(L_star, E, dataset, max_evals, file, results_dir, forced_indices=None):
     """Compute and plot Efficient Frontier for both Random Search and Tabu Search."""
     prefix = _prefix(file, results_dir)
 
     # ── Random Search ──────────────────────────────────────────────────────────
-    _, _, _, _, H_rs = random_search(dataset, max_evals, E)
+    _, _, _, _, H_rs = random_search(dataset, max_evals, E, forced_indices)
     dominated_rs, dominating_rs = dominated(H_rs, 'RS', file, results_dir)
 
     fig = plt.figure(figsize=(8, 6))
@@ -76,7 +76,7 @@ def efficientfrontier(L_star, E, dataset, max_evals, file, results_dir):
     plt.close(fig)
 
     # ── Tabu Search ────────────────────────────────────────────────────────────
-    _, _, _, _, H_ts = tabu_search(dataset, max_evals, L_star, E)
+    _, _, _, _, H_ts = tabu_search(dataset, max_evals, L_star, E, forced_indices)
     dominated_ts, dominating_ts = dominated(H_ts, 'TS', file, results_dir)
 
     fig = plt.figure(figsize=(8, 6))

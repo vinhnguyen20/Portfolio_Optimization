@@ -61,12 +61,19 @@ def load_dataset(file, min_invest=0.01, max_invest=1):
     }
 
 
-def create_candidate(N, K):
-    """Create a random candidate solution dict."""
+def create_candidate(N, K, forced_indices=None):
+    """
+    Create a random candidate solution dict.
+    forced_indices: list of asset indices always included (e.g. [0] for Bitcoin).
+    """
+    forced = list(forced_indices) if forced_indices else []
+    remaining = [i for i in range(N) if i not in forced]
+    extra = list(np.random.choice(remaining, K - len(forced), replace=False))
+    Q = np.array(forced + extra)
     return {
-        'Q':    np.random.permutation(N)[:K],
-        's':    np.random.rand(K),
-        'w':    np.zeros(N),
+        'Q':     Q,
+        's':     np.random.rand(K),
+        'w':     np.zeros(N),
         'CoVar': np.nan,
-        'R':    np.nan,
+        'R':     np.nan,
     }
